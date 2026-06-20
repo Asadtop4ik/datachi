@@ -71,6 +71,7 @@ class AnalysisDeps:
     """Run davomida to'planadigan holat. Tool'lar yozadi, API o'qiydi."""
 
     connector: Connector
+    question: str = ""  # joriy savol — fallback grafik avto-tanlovi uchun
     sql: str | None = None
     columns: list[str] = field(default_factory=list)
     rows: list[dict[str, Any]] = field(default_factory=list)
@@ -152,7 +153,7 @@ def build_agent(model: Any | None = None) -> Agent[AnalysisDeps, AnalysisResult]
         ctx: RunContext[AnalysisDeps], title: str, vega_spec: dict[str, Any]
     ) -> dict[str, Any]:
         """Validate a Vega-Lite spec server-side and store the safe version (with fallback)."""
-        spec = build_chart(title, vega_spec, ctx.deps.rows, ctx.deps.columns)
+        spec = build_chart(title, vega_spec, ctx.deps.rows, ctx.deps.columns, ctx.deps.question)
         ctx.deps.chart_title = title
         ctx.deps.vega_spec = spec
         return {"ok": spec is not None, "used_fallback": spec is not None and spec != vega_spec}
@@ -184,7 +185,9 @@ def _finalize(result: Any, deps: AnalysisDeps) -> Outcome:
     out = result.output
     spec = deps.vega_spec
     if spec is None:
-        spec = build_chart(out.chart_title or "", out.vega_spec, deps.rows, deps.columns)
+        spec = build_chart(
+            out.chart_title or "", out.vega_spec, deps.rows, deps.columns, deps.question
+        )
     return Outcome(
         text=out.text,
         chart_title=out.chart_title or deps.chart_title,
@@ -236,10 +239,10 @@ def run_analysis(
     connector = connector or DemoConnector()
     agent = agent or analyst_agent
 
-    deps = AnalysisDeps(connector=connector)
+    deps = AnalysisDeps(connector=connector, question=message)
     last_detail: str | None = None
     for attempt in range(1, max_attempts + 1):
-        deps = AnalysisDeps(connector=connector)
+        deps = AnalysisDeps(connector=connector, question=message)
         try:
             result = agent.run_sync(
                 message,

@@ -7,15 +7,17 @@ vega_spec, chart_title}. Xato bo'lsa muloyim matn (xom stack-trace demo'da KO'RS
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.agent.analyst import Outcome, get_demo_cache, run_analysis
 from src.db import get_app_engine
-from src.models import Conversation, Message
+from src.models import Conversation, Message, SavedChart
 
 app = FastAPI(title="Datachi AI Analytics")
 
@@ -34,6 +36,22 @@ class ChatResponse(BaseModel):
     chart_title: str
     metrics: list[dict[str, Any]] = Field(default_factory=list)
     error_detail: str | None = None
+
+
+class SaveChartRequest(BaseModel):
+    conversation_id: int | None = None
+    title: str = Field(min_length=1, max_length=255)
+    vega_spec: dict[str, Any]
+    sql: str | None = None
+
+
+class SavedChartOut(BaseModel):
+    id: int
+    conversation_id: int | None
+    title: str
+    vega_spec: dict[str, Any]
+    sql: str | None
+    created_at: datetime
 
 
 @app.get("/health")
@@ -88,3 +106,61 @@ def chat(req: ChatRequest) -> ChatResponse:
         metrics=outcome.metrics,
         error_detail=outcome.error_detail,
     )
+
+
+def _chart_out(chart: SavedChart) -> SavedChartOut:
+    return SavedChartOut(
+        id=chart.id,
+        conversation_id=chart.conversation_id,
+        title=chart.title,
+        vega_spec=chart.vega_spec,
+        sql=chart.sql,
+        created_at=chart.created_at,
+    )
+
+
+@app.post("/charts", response_model=SavedChartOut, status_code=201)
+def save_chart(req: SaveChartRequest) -> SavedChartOut:
+    """Grafikni saqlaydi (saved_charts). conversation_id berilsa, mavjudligi tekshiriladi."""
+    with Session(get_app_engine()) as session:
+        cid = req.conversation_id
+        if cid is not None and session.get(Conversation, cid) is None:
+            raise HTTPException(status_code=404, detail="conversation topilmadi")
+        chart = SavedChart(
+            conversation_id=req.conversation_id,
+            title=req.title,
+            vega_spec=req.vega_spec,
+            sql=req.sql,
+        )
+        session.add(chart)
+        session.commit()
+        session.refresh(chart)
+        return _chart_out(chart)
+
+
+@app.get("/charts", response_model=list[SavedChartOut])
+def list_charts(limit: int = 50) -> list[SavedChartOut]:
+    """Saqlangan grafiklar (eng yangisi birinchi)."""
+    with Session(get_app_engine()) as session:
+        charts = (
+            session.execute(
+                select(SavedChart)
+                .order_by(SavedChart.created_at.desc(), SavedChart.id.desc())
+                .limit(limit)
+            )
+            .scalars()
+            .all()
+        )
+        return [_chart_out(c) for c in charts]
+
+
+@app.delete("/charts/{chart_id}", status_code=204)
+def delete_chart(chart_id: int) -> Response:
+    """Saqlangan grafikni o'chiradi."""
+    with Session(get_app_engine()) as session:
+        chart = session.get(SavedChart, chart_id)
+        if chart is None:
+            raise HTTPException(status_code=404, detail="chart topilmadi")
+        session.delete(chart)
+        session.commit()
+    return Response(status_code=204)

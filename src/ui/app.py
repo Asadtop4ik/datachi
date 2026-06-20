@@ -48,7 +48,49 @@ def call_api(message: str, conversation_id: int | None) -> dict[str, Any]:
         }
 
 
-def _render_assistant(msg: dict[str, Any]) -> None:
+def save_chart_api(msg: dict[str, Any]) -> bool:
+    """Joriy javob grafigini API /charts ga saqlaydi. Muvaffaqiyatda True."""
+    spec = msg.get("vega_spec")
+    if not spec:
+        return False
+    payload = {
+        "conversation_id": msg.get("conversation_id"),
+        "title": msg.get("chart_title") or "Grafik",
+        "vega_spec": spec,
+        "sql": msg.get("sql"),
+    }
+    try:
+        resp = requests.post(
+            f"{get_settings().api_url}/charts", json=payload, timeout=REQUEST_TIMEOUT
+        )
+        resp.raise_for_status()
+        return True
+    except requests.exceptions.RequestException:
+        return False
+
+
+def list_saved_charts_api() -> list[dict[str, Any]]:
+    """Saqlangan grafiklar ro'yxati (xatoda bo'sh)."""
+    try:
+        resp = requests.get(f"{get_settings().api_url}/charts", timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.RequestException:
+        return []
+
+
+def delete_saved_chart_api(chart_id: int) -> bool:
+    try:
+        resp = requests.delete(
+            f"{get_settings().api_url}/charts/{chart_id}", timeout=REQUEST_TIMEOUT
+        )
+        resp.raise_for_status()
+        return True
+    except requests.exceptions.RequestException:
+        return False
+
+
+def _render_assistant(msg: dict[str, Any], key: str = "") -> None:
     st.markdown(msg.get("text", ""))
     metrics = msg.get("metrics") or []
     if metrics:
@@ -58,6 +100,11 @@ def _render_assistant(msg: dict[str, Any]) -> None:
     spec = msg.get("vega_spec")
     if spec:
         st.vega_lite_chart(spec, use_container_width=True)
+        if key and st.button("💾 Saqlash", key=f"save_{key}"):
+            if save_chart_api(msg):
+                st.success("Grafik saqlandi ✅ ('📌 Saqlangan' tabida ko'ring)")
+            else:
+                st.warning("Saqlab bo'lmadi (API ishlayaptimi?)")
     rows = msg.get("rows") or []
     sql = msg.get("sql")
     if sql:
@@ -72,17 +119,38 @@ def _render_assistant(msg: dict[str, Any]) -> None:
             st.caption(detail)
 
 
-def _handle_prompt(prompt: str) -> None:
+def _render_saved_tab() -> None:
+    """Saqlangan grafiklar gallereyasi (ko'rish + o'chirish)."""
+    charts = list_saved_charts_api()
+    if not charts:
+        st.info("Hali grafik saqlanmagan. Suhbatda grafik ostidagi '💾 Saqlash' tugmasini bos.")
+        return
+    for c in charts:
+        st.subheader(c.get("title") or "Grafik")
+        created = (c.get("created_at") or "")[:19].replace("T", " ")
+        if created:
+            st.caption(created)
+        spec = c.get("vega_spec")
+        if spec:
+            st.vega_lite_chart(spec, use_container_width=True)
+        csql = c.get("sql")
+        if csql:
+            with st.expander("SQL"):
+                st.code(csql, language="sql")
+        if st.button("🗑 O'chirish", key=f"del_{c['id']}"):
+            delete_saved_chart_api(c["id"])
+            st.rerun()
+        st.divider()
+
+
+def _process_prompt(prompt: str) -> None:
+    """Savolni yuboradi, tarixga yozadi. Render replay loop'da bo'ladi (rerun'dan keyin)."""
     st.session_state.history.append({"role": "user", "text": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    with st.chat_message("assistant"):
-        with st.spinner("Tahlil qilinmoqda…"):
-            result = call_api(prompt, st.session_state.conversation_id)
-        st.session_state.conversation_id = result.get("conversation_id")
-        result["role"] = "assistant"
-        st.session_state.history.append(result)
-        _render_assistant(result)
+    with st.spinner("Tahlil qilinmoqda…"):
+        result = call_api(prompt, st.session_state.conversation_id)
+    st.session_state.conversation_id = result.get("conversation_id")
+    result["role"] = "assistant"
+    st.session_state.history.append(result)
 
 
 def main() -> None:
@@ -109,17 +177,25 @@ def main() -> None:
             st.session_state.conversation_id = None
             st.rerun()
 
-    # Mavjud tarixni qayta chizish.
-    for msg in st.session_state.history:
-        with st.chat_message(msg["role"]):
-            if msg["role"] == "assistant":
-                _render_assistant(msg)
-            else:
-                st.markdown(msg.get("text", ""))
+    tab_chat, tab_saved = st.tabs(["💬 Suhbat", "📌 Saqlangan grafiklar"])
 
+    with tab_chat:
+        # Mavjud tarixni qayta chizish (yangi javob ham shu yerda — _process_prompt + rerun).
+        for i, msg in enumerate(st.session_state.history):
+            with st.chat_message(msg["role"]):
+                if msg["role"] == "assistant":
+                    _render_assistant(msg, key=f"h{i}")
+                else:
+                    st.markdown(msg.get("text", ""))
+
+    with tab_saved:
+        _render_saved_tab()
+
+    # chat_input tab'lardan tashqarida -> pastga mahkamlanadi, har ikki tab'da ko'rinadi.
     prompt = st.chat_input("Savolingiz…") or st.session_state.pop("pending", None)
     if prompt:
-        _handle_prompt(prompt)
+        _process_prompt(prompt)
+        st.rerun()
 
 
 if __name__ == "__main__":
