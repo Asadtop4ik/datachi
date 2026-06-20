@@ -50,6 +50,11 @@ def call_api(message: str, conversation_id: int | None) -> dict[str, Any]:
 
 def _render_assistant(msg: dict[str, Any]) -> None:
     st.markdown(msg.get("text", ""))
+    metrics = msg.get("metrics") or []
+    if metrics:
+        cols = st.columns(len(metrics))
+        for col, m in zip(cols, metrics, strict=False):
+            col.metric(m.get("label", ""), m.get("value", ""), m.get("delta"))
     spec = msg.get("vega_spec")
     if spec:
         st.vega_lite_chart(spec, use_container_width=True)

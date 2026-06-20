@@ -70,6 +70,8 @@ HOW TO WORK
 OUTPUT
   Return a structured result with:
     - text:        a clear narration of the answer, max 3 sentences, in the user's language.
+                   When relevant, name the leader's share of the total, or the trend vs the
+                   previous period (e.g. "+12% vs last month") — concrete numbers, not vague words.
     - chart_title: a short title for the chart, in the user's language.
     - vega_spec:   the Vega-Lite spec you passed to make_chart (or null if a chart makes no sense).
   Keep it concise. Numbers are in UZS (so'm).

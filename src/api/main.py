@@ -32,6 +32,7 @@ class ChatResponse(BaseModel):
     rows: list[dict[str, Any]]
     vega_spec: dict[str, Any] | None
     chart_title: str
+    metrics: list[dict[str, Any]] = Field(default_factory=list)
     error_detail: str | None = None
 
 
@@ -84,5 +85,6 @@ def chat(req: ChatRequest) -> ChatResponse:
         rows=outcome.rows,
         vega_spec=outcome.vega_spec,
         chart_title=outcome.chart_title,
+        metrics=outcome.metrics,
         error_detail=outcome.error_detail,
     )

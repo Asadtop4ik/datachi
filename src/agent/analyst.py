@@ -23,6 +23,7 @@ from pydantic_ai.usage import UsageLimits
 
 from src.agent.cache import DemoCache
 from src.agent.charts import build_chart
+from src.agent.insights import derive_insights
 from src.agent.prompts import SYSTEM_PROMPT
 from src.config import get_settings
 from src.connectors.base import Connector
@@ -97,6 +98,7 @@ class Outcome:
     sql: str | None
     columns: list[str]
     rows: list[dict[str, Any]]
+    metrics: list[dict[str, Any]] = field(default_factory=list)
     error_detail: str | None = None
 
 
@@ -190,6 +192,7 @@ def _finalize(result: Any, deps: AnalysisDeps) -> Outcome:
         sql=deps.sql,
         columns=deps.columns,
         rows=deps.rows,
+        metrics=derive_insights(deps.rows, deps.columns),
     )
 
 
@@ -205,6 +208,7 @@ def _outcome_from_cache(cached: dict[str, Any], detail: str | None) -> Outcome:
         sql=cached.get("sql"),
         columns=cached.get("columns") or [],
         rows=cached.get("rows") or [],
+        metrics=cached.get("metrics") or [],
         error_detail=note,
     )
 

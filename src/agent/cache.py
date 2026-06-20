@@ -24,7 +24,7 @@ _WHITESPACE = re.compile(r"\s+")
 _TRAILING_PUNCT = "?!.,;:؟ "
 
 # Keshda saqlanadigan maydonlar (error_detail SAQLANMAYDI — toza javob keshlanadi).
-_FIELDS = ("text", "chart_title", "vega_spec", "sql", "columns", "rows")
+_FIELDS = ("text", "chart_title", "vega_spec", "sql", "columns", "rows", "metrics")
 
 
 def normalize_key(question: str) -> str:
