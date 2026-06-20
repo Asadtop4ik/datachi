@@ -6,13 +6,19 @@ tushirmaydi (import smoke testi xatosiz). `streamlit run` da __name__ == "__main
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any
 
 import requests
 import streamlit as st
 
-from src.agent.prompts import SAMPLE_PROMPTS
-from src.config import get_settings
+# `streamlit run` sys.path[0] ni src/ui/ ga qo'yadi (root emas) -> `src` topilmaydi.
+# Shu sabab loyiha root'ini path'ga qo'shamiz (seed_demo_biz.py bilan bir xil yondashuv).
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.agent.prompts import SAMPLE_PROMPTS  # noqa: E402
+from src.config import get_settings  # noqa: E402
 
 REQUEST_TIMEOUT = 120
 
