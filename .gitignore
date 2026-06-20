@@ -220,3 +220,6 @@ __marimo__/
 
 # macOS
 .DS_Store
+
+# Demo javob keshi — runtime artifact (pitchdan oldin `scripts/warm_cache.py` bilan to'ldiriladi)
+demo_cache.json

@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.agent.analyst import Outcome, run_analysis
+from src.agent.analyst import Outcome, get_demo_cache, run_analysis
 from src.db import get_app_engine
 from src.models import Conversation, Message
 
@@ -73,7 +73,8 @@ def chat(req: ChatRequest) -> ChatResponse:
     if not message:
         raise HTTPException(status_code=400, detail="bo'sh xabar")
 
-    outcome = run_analysis(message)  # ichida xatolar ushlanadi, muloyim matn qaytaradi
+    # cache: live LLM kvota/tarmoq qoqilsa keshlangan demo javobi qaytadi (pitch yiqilmaydi).
+    outcome = run_analysis(message, cache=get_demo_cache())
     conversation_id = _persist(req.conversation_id, message, outcome)
 
     return ChatResponse(

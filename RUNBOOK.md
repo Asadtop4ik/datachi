@@ -23,14 +23,28 @@ uv run alembic upgrade head
 # 4) Sintetik biznes ma'lumotini seed qilish
 uv run python seed/seed_demo_biz.py
 
-# 5) API (alohida terminal)
+# 5) (TAVSIYA) Demo keshini oldindan to'ldirish — pitch barqarorligi uchun
+#    Kvota borligida BIR marta. Kvota/tarmoq pitchda qoqilsa, API shu keshdan javob beradi.
+uv run python scripts/warm_cache.py
+
+# 6) API (alohida terminal)
 uv run uvicorn src.api.main:app --reload
 
-# 6) UI (alohida terminal)
+# 7) UI (alohida terminal)
 uv run streamlit run src/ui/app.py
 ```
 
 UI brauzerda ochiladi (odatda http://localhost:8501). API: http://localhost:8000/health → `{"status":"ok"}`.
+
+## Demo barqarorligi (kesh)
+
+Live LLM kvota/tarmoq qoqilsa demo yiqilmasligi uchun ikki himoya bor:
+
+- **Retry+backoff:** transient xato (429 kvota / tarmoq / 5xx) da agent 3 marta qayta urinadi.
+- **Javob keshi:** muvaffaqiyatli javoblar `demo_cache.json` ga yoziladi. Keyin live yiqilsa,
+  o'sha savolga keshlangan javob (matn + grafik + SQL) qaytadi. Pitchdan oldin
+  `scripts/warm_cache.py` bilan 6 demo savolni keshlang — kvota tugasa ham demo to'liq ishlaydi.
+  Kesh javobi UI'da odatdagidek ko'rinadi; "Tafsilot (texnik)" da "served from cache" belgisi turadi.
 
 ## 3. Qo'lda demo cheklist
 
@@ -49,3 +63,6 @@ UI brauzerda ochiladi (odatda http://localhost:8501). API: http://localhost:8000
 - **`GOOGLE_API_KEY .env da bo'sh`:** `.env` ga kalit qo'ying.
 - **DB ulanmadi:** `docker compose up -d postgres` va `docker compose ps` (healthy?).
 - **Bo'sh natija / sana noto'g'ri:** seed'ni qayta ishga tushiring (anchor = bugungi kun).
+- **Gemini kvota (429) / "served from cache":** free-tier kvota tugagan. Agar savol oldin
+  keshlangan bo'lsa — javob keshdan keladi (demo davom etadi). Aks holda kvota tiklanishini
+  kuting yoki pitchdan oldin `scripts/warm_cache.py` ni ishga tushiring.

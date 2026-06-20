@@ -61,6 +61,7 @@ Pitch questions to demo: [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 | DB up | `docker compose up -d postgres` |
 | Migrate | `uv run alembic upgrade head` |
 | Seed | `uv run python seed/seed_demo_biz.py` |
+| Warm demo cache | `uv run python scripts/warm_cache.py` |
 | API | `uv run uvicorn src.api.main:app --reload` |
 | UI | `uv run streamlit run src/ui/app.py` |
 | Test | `uv run pytest` |
